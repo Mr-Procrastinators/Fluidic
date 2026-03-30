@@ -9,8 +9,9 @@ interface RadialGaugeProps {
   size?: number;
 }
 
-export function RadialGauge({ value, max, label, unit, color, size = 120 }: RadialGaugeProps) {
-  const pct = Math.min((value / max) * 100, 100);
+export function RadialGauge({ value = 0, max, label, unit, color, size = 120 }: RadialGaugeProps) {
+  const safeValue = Number(value) || 0;
+  const pct = Math.min((safeValue / max) * 100, 100);
   const data = [{ value: pct, fill: color }];
 
   return (
