@@ -9,7 +9,7 @@ import Analytics from "./pages/Analytics";
 import Alerts from "./pages/Alerts";
 import LiveMap from "./pages/LiveMap";
 import ControlPanel from "./pages/ControlPanel";
-import AIInsights from "./pages/AIInsights";
+import Logs from "./pages/Logs";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -29,7 +29,7 @@ const App = () => (
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/map" element={<LiveMap />} />
             <Route path="/control" element={<ControlPanel />} />
-            <Route path="/ai" element={<AIInsights />} />
+            <Route path="/logs" element={<Logs />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

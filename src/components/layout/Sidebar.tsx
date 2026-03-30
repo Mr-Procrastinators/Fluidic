@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, BarChart3, AlertTriangle, Map, Settings, Brain, X } from "lucide-react";
+import { LayoutDashboard, BarChart3, AlertTriangle, Map, Settings, Database, X } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -7,7 +7,7 @@ const navItems = [
   { to: "/alerts", label: "Alerts & Faults", icon: AlertTriangle },
   { to: "/map", label: "Live Map", icon: Map },
   { to: "/control", label: "Control Panel", icon: Settings },
-  { to: "/ai", label: "AI Insights", icon: Brain },
+  { to: "/logs", label: "GA-VMD Logs", icon: Database },
 ];
 
 interface SidebarProps {
@@ -20,7 +20,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     <>
       {open && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />}
       <aside
-        className={`fixed lg:static z-50 top-0 left-0 h-full w-60 flex flex-col transition-transform lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed lg:static z-50 top-0 left-0 h-full w-60 flex flex-col transition-transform lg:translate-x-0 overflow-hidden ${open ? "translate-x-0" : "-translate-x-full"}`}
         style={{ backgroundColor: "#0d1b2a" }}
       >
         <div className="flex items-center justify-between p-5">

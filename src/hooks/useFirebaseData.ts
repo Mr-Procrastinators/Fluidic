@@ -26,30 +26,60 @@ export interface AlertItem {
 }
 
 export function useScadaData() {
-  const [data, setData] = useState<ScadaData>({
+  const defaultData: ScadaData = {
     flow1: 0, flow2: 0, level: 0, pump: 0, mode: "AUTO", pressure: 0, valve: 0,
-  });
+  };
+  const [data, setData] = useState<ScadaData>(defaultData);
 
   useEffect(() => {
-    const dbRef = ref(database, "SCADA_DATA");
-    const unsub = onValue(dbRef, (snapshot) => {
-      if (snapshot.exists()) setData(snapshot.val());
-    });
-    return () => unsub();
+    try {
+      const dbRef = ref(database, "SCADA_DATA");
+      const unsub = onValue(dbRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const firebaseData = snapshot.val();
+          // Always merge with defaults to ensure no undefined values
+          setData({ ...defaultData, ...firebaseData });
+        } else {
+          setData(defaultData);
+        }
+      }, (error) => {
+        console.error("Firebase SCADA_DATA error:", error);
+        setData(defaultData);
+      });
+      return () => unsub();
+    } catch (error) {
+      console.error("useScadaData setup error:", error);
+      setData(defaultData);
+    }
   }, []);
 
   return data;
 }
 
 export function usePipelineData() {
-  const [data, setData] = useState<PipelineData>({ tds: 0, turbidity: 0, ph: 0 });
+  const defaultData: PipelineData = { tds: 0, turbidity: 0, ph: 0 };
+  const [data, setData] = useState<PipelineData>(defaultData);
 
   useEffect(() => {
-    const dbRef = ref(database, "pipeline");
-    const unsub = onValue(dbRef, (snapshot) => {
-      if (snapshot.exists()) setData(snapshot.val());
-    });
-    return () => unsub();
+    try {
+      const dbRef = ref(database, "pipeline");
+      const unsub = onValue(dbRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const firebaseData = snapshot.val();
+          // Always merge with defaults to ensure no undefined values
+          setData({ ...defaultData, ...firebaseData });
+        } else {
+          setData(defaultData);
+        }
+      }, (error) => {
+        console.error("Firebase pipeline error:", error);
+        setData(defaultData);
+      });
+      return () => unsub();
+    } catch (error) {
+      console.error("usePipelineData setup error:", error);
+      setData(defaultData);
+    }
   }, []);
 
   return data;

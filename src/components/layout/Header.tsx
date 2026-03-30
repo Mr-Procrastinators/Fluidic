@@ -12,7 +12,7 @@ export function Header({ title, onMenuClick }: HeaderProps) {
   const dateStr = time.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
 
   return (
-    <header className="h-14 flex items-center justify-between px-4" style={{ backgroundColor: "#0d1b2a" }}>
+    <header className="h-14 flex items-center justify-between px-4 overflow-hidden" style={{ backgroundColor: "#0d1b2a" }}>
       <div className="flex items-center gap-3">
         <button onClick={onMenuClick} className="lg:hidden text-white">
           <Menu className="w-5 h-5" />

@@ -9,7 +9,7 @@ const pageTitles: Record<string, string> = {
   "/alerts": "Alerts & Fault Management",
   "/map": "Live Pipeline Map",
   "/control": "Control Panel",
-  "/ai": "AI Insights — ML Diagnostics",
+  "/logs": "GA-VMD Logs — Leak Detection",
 };
 
 export function AppLayout() {
@@ -18,9 +18,9 @@ export function AppLayout() {
   const title = pageTitles[path] || "FLUIDIC SCADA";
 
   return (
-    <div className="flex h-screen" style={{ backgroundColor: "#f1f5f9" }}>
+    <div className="flex h-screen overflow-hidden" style={{ backgroundColor: "#f1f5f9" }}>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header title={title} onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
           <Outlet />
