@@ -9,8 +9,9 @@ interface RadialGaugeProps {
   size?: number;
 }
 
-export function RadialGauge({ value, max, label, unit, color, size = 120 }: RadialGaugeProps) {
-  const pct = Math.min((value / max) * 100, 100);
+export function RadialGauge({ value = 0, max, label, unit, color, size = 120 }: RadialGaugeProps) {
+  const safeValue = Number(value) || 0;
+  const pct = Math.min((safeValue / max) * 100, 100);
   const data = [{ value: pct, fill: color }];
 
   return (
@@ -32,7 +33,7 @@ export function RadialGauge({ value, max, label, unit, color, size = 120 }: Radi
           <RadialBar background dataKey="value" cornerRadius={4} />
         </RadialBarChart>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-black" style={{ color }}>{value.toFixed(1)}</span>
+          <span className="text-lg font-black" style={{ color }}>{safeValue.toFixed(1)}</span>
           <span className="text-[9px] text-slate-400 font-bold uppercase">{unit}</span>
         </div>
       </div>
