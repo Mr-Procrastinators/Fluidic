@@ -34,7 +34,7 @@ export default function ControlPanel() {
 
   return (
     <div className="space-y-4 min-h-screen">
-      {/* Top stat cards */}
+      {/* Top stat cards - Pressure is calculated from flow values using Bernoulli principle */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 border-l-4 border-l-blue-500">
           <div className="text-[10px] font-bold uppercase text-slate-400">Flow Rate</div>
