@@ -20,11 +20,16 @@ export default function Analytics() {
     });
   }, [scada.flow1, scada.pressure, pipeline.tds]);
 
+  const f1 = Number(scada.flow1) || 0;
+  const pr = Number(scada.pressure) || 0;
+  const td = Number(pipeline.tds) || 0;
+  const ph = Number(pipeline.ph) || 0;
+
   const stats = [
-    { label: "Avg Flow Rate", value: `${scada.flow1.toFixed(1)} L/min`, color: "text-blue-600" },
-    { label: "Avg Pressure", value: `${scada.pressure.toFixed(1)} bar`, color: "text-emerald-600" },
-    { label: "Avg TDS", value: `${pipeline.tds.toFixed(0)} ppm`, color: "text-indigo-600" },
-    { label: "Avg pH", value: `${pipeline.ph.toFixed(1)}`, color: "text-green-600" },
+    { label: "Avg Flow Rate", value: `${f1.toFixed(1)} L/min`, color: "text-blue-600" },
+    { label: "Avg Pressure", value: `${pr.toFixed(1)} bar`, color: "text-emerald-600" },
+    { label: "Avg TDS", value: `${td.toFixed(0)} ppm`, color: "text-indigo-600" },
+    { label: "Avg pH", value: `${ph.toFixed(1)}`, color: "text-green-600" },
   ];
 
   return (
