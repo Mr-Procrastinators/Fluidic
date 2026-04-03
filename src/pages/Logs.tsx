@@ -20,6 +20,12 @@ export default function Logs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [latestResult, setLatestResult] = useState<GAVMDResult | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [now, setNow] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const resultsRef = ref(database, "results");
@@ -55,11 +61,14 @@ export default function Logs() {
     return status === "LEAK" ? "🚨" : "✓";
   };
 
+  const isResultFresh = !!latestResult && Math.abs(now/1000 - latestResult.timestamp) < 12;
+  const realtimeResult = isResultFresh ? latestResult : null;
+
   return (
     <div className="w-full">
       <div className="space-y-6">
         {/* Hero card - Latest Result */}
-        {latestResult ? (
+        {latestResult && isResultFresh ? (
           <div
             className={`rounded-3xl shadow-xl border p-8 lg:p-12 text-center transition-all ${getStatusStyles(latestResult.status)}`}
           >
@@ -77,6 +86,14 @@ export default function Logs() {
             )}
             <p className="text-sm opacity-80 mt-4">
               Flow: {latestResult.flow.toFixed(2)} L/min | {new Date(latestResult.timestamp * 1000).toLocaleString()}
+            </p>
+          </div>
+        ) : latestResult && !isResultFresh ? (
+          <div className="bg-yellow-100 rounded-3xl shadow-xl border border-yellow-300 p-8 lg:p-12 text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <div className="text-xl font-black text-yellow-900">Stale GA-VMD result</div>
+            <p className="text-slate-500 text-sm mt-2">
+              Sensor data is stale or ESP32 is disconnected. Waiting for a fresh reading...
             </p>
           </div>
         ) : (
@@ -181,3 +198,4 @@ export default function Logs() {
     </div>
   );
 }
+
