@@ -28,7 +28,7 @@ export default function Logs() {
   }, []);
 
   useEffect(() => {
-    const resultsRef = ref(database, "results");
+    const resultsRef = ref(database, "gavmd_result");
     
     const unsubscribe = onValue(resultsRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -61,7 +61,7 @@ export default function Logs() {
     return status === "LEAK" ? "🚨" : "✓";
   };
 
-  const isResultFresh = !!latestResult && Math.abs(now/1000 - latestResult.timestamp) < 12;
+  const isResultFresh = !!latestResult && Math.abs(now/1000 - latestResult.timestamp) < 60
   const realtimeResult = isResultFresh ? latestResult : null;
 
   return (
@@ -198,4 +198,3 @@ export default function Logs() {
     </div>
   );
 }
-
