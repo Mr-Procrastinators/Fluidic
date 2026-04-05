@@ -62,7 +62,7 @@ export function usePipelineData() {
 
   useEffect(() => {
     try {
-      const dbRef = ref(database, "pipeline");
+      const dbRef = ref(database, "gavmd_result");
       const unsub = onValue(dbRef, (snapshot) => {
         if (snapshot.exists()) {
           const firebaseData = snapshot.val();
