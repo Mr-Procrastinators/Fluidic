@@ -4,13 +4,13 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 const LOCATIONS = [
-  { id: "SP-01", name: "SP-01 (Rajpur Road)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 30.3199, lng: 77.9930 },
-  { id: "SP-02", name: "SP-02 (Delhi Road)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 30.3400, lng: 77.9500 },
-  { id: "SP-03", name: "SP-03 (Race Course)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 30.3300, lng: 77.9800 },
-  { id: "SP-04", name: "SP-04 (Clement Town)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 30.3100, lng: 77.9400 },
-  { id: "SP-05", name: "SP-05 (Ballupur)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 30.3500, lng: 77.9700 },
-  { id: "SP-06", name: "SP-06 (Prem Nagar)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 30.3250, lng: 77.9600 },
-  { id: "SP-07", name: "SP-07 (Chakrata Rd)", status: "ALERT", signal: "Leakage Probability High", statusColor: "bg-red-100 text-red-600", lat: 30.3050, lng: 77.9350 },
+  { id: "SP-01", name: "SP-01 (Sector 18)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 28.5708, lng: 77.3261 },
+  { id: "SP-02", name: "SP-02 (Sector 62)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 28.6280, lng: 77.3649 },
+  { id: "SP-03", name: "SP-03 (Sector 137)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 28.5120, lng: 77.4040 },
+  { id: "SP-04", name: "SP-04 (Sector 50)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 28.5700, lng: 77.3680 },
+  { id: "SP-05", name: "SP-05 (Sector 44)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 28.5560, lng: 77.3450 },
+  { id: "SP-06", name: "SP-06 (Sector 15)", status: "ONLINE", signal: "Signal Strong", statusColor: "bg-emerald-100 text-emerald-600", lat: 28.5870, lng: 77.3120 },
+  { id: "SP-07", name: "SP-07 (Sector 76)", status: "ALERT", signal: "Leakage Probability High", statusColor: "bg-red-100 text-red-600", lat: 28.5600, lng: 77.3900 },
 ];
 
 export default function LiveMap() {
@@ -21,7 +21,7 @@ export default function LiveMap() {
   useEffect(() => {
     // Initialize map
     if (!mapRef.current) {
-      mapRef.current = L.map("map").setView([30.3254, 77.9345], 13);
+      mapRef.current = L.map("map").setView([28.5700, 77.3500], 12);
       
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; OpenStreetMap contributors',
@@ -109,7 +109,7 @@ export default function LiveMap() {
             <span className="text-emerald-500">●</span>
             <div>
               <p className="text-[9px] text-slate-400 font-bold uppercase">Location</p>
-              <p className="text-sm font-black">Dehradun, UK</p>
+              <p className="text-sm font-black">Noida, UP</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export default function LiveMap() {
             </div>
           </div>
           <a
-            href="https://www.google.com/maps/place/Dehradun,+Uttarakhand/@30.32540262561745,77.93473309708197,11z"
+            href="https://www.google.com/maps/place/Noida,+Uttar+Pradesh"
             target="_blank"
             rel="noopener noreferrer"
             className="ml-auto bg-emerald-600 text-white px-4 py-2 rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition active:scale-95"
