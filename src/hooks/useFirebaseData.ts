@@ -30,6 +30,18 @@ const toNumber = (value: unknown, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+const isScadaPayload = (payload: unknown) => {
+  if (!payload || typeof payload !== "object") return false;
+  const source = payload as Record<string, unknown>;
+  return ["flow1", "flow2", "level", "pressure", "pump", "mode", "valve"].some((key) => key in source);
+};
+
+const isPipelinePayload = (payload: unknown) => {
+  if (!payload || typeof payload !== "object") return false;
+  const source = payload as Record<string, unknown>;
+  return ["tds", "turbidity", "ph"].some((key) => key in source);
+};
+
 const normalizeScada = (payload: any): ScadaData => {
   const source = payload && typeof payload === "object" ? payload : {};
 
@@ -69,7 +81,7 @@ export function useScadaData() {
 
   useEffect(() => {
     try {
-      const branches = ["SCADA_DATA", "scada_data", "scada", "data"];
+      const branches = ["SCADA_DATA", "scada_data", "scada"];
       const unsubscribers = branches.map((branch) => {
         const dbRef = ref(database, branch);
 
@@ -79,6 +91,8 @@ export function useScadaData() {
             if (!snapshot.exists()) return;
 
             const firebaseData = snapshot.val();
+            if (!isScadaPayload(firebaseData)) return;
+
             const nextData = normalizeScada(firebaseData);
             setData({ ...defaultData, ...nextData });
           },
@@ -107,7 +121,7 @@ export function usePipelineData() {
 
   useEffect(() => {
     try {
-      const branches = ["pipeline", "pipeline_data", "water_quality", "data"];
+      const branches = ["pipeline", "water_quality", "pipeline_data"];
       const unsubscribers = branches.map((branch) => {
         const dbRef = ref(database, branch);
 
@@ -117,6 +131,8 @@ export function usePipelineData() {
             if (!snapshot.exists()) return;
 
             const firebaseData = snapshot.val();
+            if (!isPipelinePayload(firebaseData)) return;
+
             const nextData = normalizePipeline(firebaseData);
             setData({ ...defaultData, ...nextData });
           },
@@ -143,7 +159,7 @@ export function useAlerts() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
 
   useEffect(() => {
-    const branches = ["alerts", "alerts_data", "faults"];
+    const branches = ["alerts", "faults"];
     const unsubscribers = branches.map((branch) => {
       const dbRef = ref(database, branch);
 
