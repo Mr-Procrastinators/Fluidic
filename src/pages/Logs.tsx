@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { database, ref, onValue } from "@/lib/firebase";
 
 interface GAVMDResult {
@@ -29,26 +30,135 @@ export default function Logs() {
 
   useEffect(() => {
     const resultsRef = ref(database, "gavmd_result");
-    
+
     const unsubscribe = onValue(resultsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         setLatestResult(data);
         setIsMonitoring(true);
 
-        // Add to logs with timestamp
         const newLog: LogEntry = {
           id: Date.now().toString(),
           result: data,
           createdAt: new Date(),
         };
 
-        setLogs((prev) => [newLog, ...prev].slice(0, 100)); // Keep last 100 logs
+        setLogs((prev) => [newLog, ...prev].slice(0, 100));
       }
     });
 
     return () => unsubscribe();
   }, []);
+
+  const exportPdfForm = async () => {
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([595.28, 841.89]);
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    page.drawText("Fluidic Leak Detection Report", {
+      x: 50,
+      y: 790,
+      size: 22,
+      font: bold,
+      color: rgb(0.1, 0.2, 0.35),
+    });
+
+    const statusText = latestResult?.status === "LEAK" ? "LEAK DETECTED" : "NORMAL";
+    const statusColor = latestResult?.status === "LEAK" ? rgb(0.8, 0.1, 0.2) : rgb(0.12, 0.55, 0.3);
+
+    page.drawText("Status:", {
+      x: 50,
+      y: 740,
+      size: 14,
+      font,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+
+    page.drawText(statusText, {
+      x: 140,
+      y: 740,
+      size: 16,
+      font: bold,
+      color: statusColor,
+    });
+
+    page.drawText(`Flow: ${latestResult ? latestResult.flow.toFixed(2) : "0.00"} L/min`, {
+      x: 50,
+      y: 700,
+      size: 14,
+      font,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+
+    page.drawText(`Distance: ${latestResult ? latestResult.location_m.toFixed(1) : "0.0"} meters`, {
+      x: 50,
+      y: 670,
+      size: 14,
+      font,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+
+    page.drawText(`Coordinates: ${latestResult ? latestResult.latitude.toFixed(4) : "0.0000"}°, ${latestResult ? latestResult.longitude.toFixed(4) : "0.0000"}°`, {
+      x: 50,
+      y: 640,
+      size: 14,
+      font,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+
+    const timestamp = latestResult ? new Date(latestResult.timestamp * 1000).toLocaleString() : new Date().toLocaleString();
+    page.drawText(`Timestamp: ${timestamp}`, {
+      x: 50,
+      y: 610,
+      size: 12,
+      font,
+      color: rgb(0.3, 0.3, 0.3),
+    });
+
+    // Real PDF form fields
+    const statusField = pdfDoc.createTextField("statusField");
+    statusField.setText(statusText);
+    statusField.setPosition(230, 735, 0);
+    statusField.setSize(200, 20);
+
+    const flowField = pdfDoc.createTextField("flowField");
+    flowField.setText(latestResult ? `${latestResult.flow.toFixed(2)} L/min` : "0.00 L/min");
+    flowField.setPosition(230, 695, 0);
+    flowField.setSize(200, 20);
+
+    const distanceField = pdfDoc.createTextField("distanceField");
+    distanceField.setText(latestResult ? `${latestResult.location_m.toFixed(1)} meters` : "0.0 meters");
+    distanceField.setPosition(230, 655, 0);
+    distanceField.setSize(200, 20);
+
+    const timestampField = pdfDoc.createTextField("timestampField");
+    timestampField.setText(timestamp);
+    timestampField.setPosition(230, 615, 0);
+    timestampField.setSize(250, 20);
+
+    const faultField = pdfDoc.createCheckBox("faultField");
+    if (latestResult?.status === "LEAK") faultField.check();
+    faultField.setPosition(50, 585, 0);
+    faultField.setSize(15, 15);
+
+    page.drawText("Fault detected", {
+      x: 75,
+      y: 586,
+      size: 12,
+      font,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const blob = new Blob([pdfBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "fluidic-leak-report.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const getStatusStyles = (status: string) => {
     if (status === "LEAK") {
@@ -61,13 +171,21 @@ export default function Logs() {
     return status === "LEAK" ? "🚨" : "✓";
   };
 
-  const isResultFresh = !!latestResult && Math.abs(now/1000 - latestResult.timestamp) < 60
+  const isResultFresh = !!latestResult && Math.abs(now / 1000 - latestResult.timestamp) < 60;
   const realtimeResult = isResultFresh ? latestResult : null;
 
   return (
     <div className="w-full">
       <div className="space-y-6">
-        {/* Hero card - Latest Result */}
+        <div className="flex justify-end">
+          <button
+            onClick={exportPdfForm}
+            className="bg-slate-800 text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide hover:bg-slate-700"
+          >
+            Export PDF Form
+          </button>
+        </div>
+
         {latestResult && isResultFresh ? (
           <div
             className={`rounded-3xl shadow-xl border p-8 lg:p-12 text-center transition-all ${getStatusStyles(latestResult.status)}`}
@@ -106,7 +224,6 @@ export default function Logs() {
           </div>
         )}
 
-        {/* Analysis Metrics */}
         {latestResult && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 text-center">
@@ -138,7 +255,6 @@ export default function Logs() {
           </div>
         )}
 
-        {/* Logs Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest">
             📋 Detection Logs (GA-VMD)
