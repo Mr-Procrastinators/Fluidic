@@ -28,6 +28,23 @@ flow_buffer = []
 START_LAT = 26.8467
 START_LON = 80.9462
 
+
+def get_live_flow():
+    try:
+        data = ref.get()
+        if not data or "flow" not in data:
+            return None
+
+        flow_value = data["flow"]
+        try:
+            return float(flow_value)
+        except (TypeError, ValueError):
+            return None
+    except Exception as e:
+        print("Firebase read error:", e)
+        return None
+
+
 def get_leak_location(L1):
     angle = 0  # change if pipe direction changes
 
@@ -39,28 +56,21 @@ def get_leak_location(L1):
 
     return lat, lon
 
+
 # ================= STEP 1: COLLECT DATA =================
-print("⏳ Collecting data for GA training...")
+print("⏳ Waiting for real flow data from ESP32...")
 
 while len(flow_buffer) < WINDOW_SIZE:
-    try:
-        data = ref.get()
+    flow = get_live_flow()
 
-        if data and "flow" in data:
-            flow = data["flow"]
-        else:
-            # 🔥 fallback (no ESP32)
-            flow = np.random.normal(10, 0.5)
-            print("⚠️ Using mock data")
-
-        flow_buffer.append(flow)
-        print(f"{len(flow_buffer)}/100 → {flow}")
-
-        time.sleep(1)
-
-    except Exception as e:
-        print("Error:", e)
+    if flow is None:
+        print("No real flow data yet. Waiting for ESP32 input...")
         time.sleep(2)
+        continue
+
+    flow_buffer.append(flow)
+    print(f"{len(flow_buffer)}/{WINDOW_SIZE} → {flow}")
+    time.sleep(1)
 
 print("✅ Data ready!")
 
@@ -96,8 +106,9 @@ def fitness_func(ga, solution, solution_idx):
 
         return -(entropy + 0.01 * K)
 
-    except:
+    except Exception:
         return -1e9
+
 
 # ================= RUN GA =================
 print("🔧 Running GA...")
@@ -131,12 +142,12 @@ print("🚀 Starting Monitoring...")
 
 while True:
     try:
-        data = ref.get()
+        flow = get_live_flow()
 
-        if data and "flow" in data:
-            flow = data["flow"]
-        else:
-            flow = np.random.normal(10, 0.5)
+        if flow is None:
+            print("No live ESP32 data available. Waiting for sensor input...")
+            time.sleep(2)
+            continue
 
         flow_buffer.append(flow)
         if len(flow_buffer) > WINDOW_SIZE:
@@ -162,7 +173,7 @@ while True:
 
             lat, lon = get_leak_location(L1)
 
-            # 🔥 Send to Firebase
+            # 🔥 Send only real sensor data
             result_ref.set({
                 "status": "LEAK" if is_leak else "NORMAL",
                 "location_m": float(L1),
