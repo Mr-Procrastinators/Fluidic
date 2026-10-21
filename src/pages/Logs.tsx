@@ -29,25 +29,40 @@ export default function Logs() {
   }, []);
 
   useEffect(() => {
-    const resultsRef = ref(database, "gavmd_result");
+    const paths = ["results", "gavmd_result"];
+    const unsubscribers = paths.map((path) => {
+      const dbRef = ref(database, path);
+      return onValue(dbRef, (snapshot) => {
+        if (!snapshot.exists()) return;
 
-    const unsubscribe = onValue(resultsRef, (snapshot) => {
-      if (snapshot.exists()) {
         const data = snapshot.val();
-        setLatestResult(data);
+        if (!data || typeof data !== "object") return;
+
+        const result: GAVMDResult = {
+          status: data.status === "LEAK" ? "LEAK" : "NORMAL",
+          location_m: Number(data.location_m ?? 0),
+          latitude: Number(data.latitude ?? 0),
+          longitude: Number(data.longitude ?? 0),
+          flow: Number(data.flow ?? 0),
+          timestamp: Number(data.timestamp ?? Date.now() / 1000),
+        };
+
+        setLatestResult(result);
         setIsMonitoring(true);
 
         const newLog: LogEntry = {
-          id: Date.now().toString(),
-          result: data,
-          createdAt: new Date(),
+          id: `${path}-${result.timestamp}-${Math.random().toString(16).slice(2)}`,
+          result,
+          createdAt: new Date(result.timestamp * 1000),
         };
 
-        setLogs((prev) => [newLog, ...prev].slice(0, 100));
-      }
+        setLogs((prev) => [newLog, ...prev.filter((log) => log.id !== newLog.id)].slice(0, 100));
+      });
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
   }, []);
 
   const exportPdfForm = async () => {
@@ -116,7 +131,6 @@ export default function Logs() {
       color: rgb(0.3, 0.3, 0.3),
     });
 
-    // Real PDF form fields
     const statusField = pdfDoc.createTextField("statusField");
     statusField.setText(statusText);
     statusField.setPosition(230, 735, 0);
@@ -172,7 +186,6 @@ export default function Logs() {
   };
 
   const isResultFresh = !!latestResult && Math.abs(now / 1000 - latestResult.timestamp) < 60;
-  const realtimeResult = isResultFresh ? latestResult : null;
 
   return (
     <div className="w-full">
@@ -187,19 +200,15 @@ export default function Logs() {
         </div>
 
         {latestResult && isResultFresh ? (
-          <div
-            className={`rounded-3xl shadow-xl border p-8 lg:p-12 text-center transition-all ${getStatusStyles(latestResult.status)}`}
-          >
+          <div className={`rounded-3xl shadow-xl border p-8 lg:p-12 text-center transition-all ${getStatusStyles(latestResult.status)}`}>
             <div className="text-7xl mb-4">{getStatusIcon(latestResult.status)}</div>
-            <div className="uppercase tracking-[0.3em] text-[10px] font-bold mb-3">
-              Current System Status
-            </div>
+            <div className="uppercase tracking-[0.3em] text-[10px] font-bold mb-3">Current System Status</div>
             <div className="text-3xl lg:text-4xl font-black mb-2">
               {latestResult.status === "LEAK" ? "⚠️ LEAK DETECTED" : "✓ System Normal"}
             </div>
             {latestResult.status === "LEAK" && (
               <div className="text-lg font-bold mt-4">
-                Location: {latestResult.location_m.toFixed(2)} m | LLat: {latestResult.latitude.toFixed(4)}°, Lon: {latestResult.longitude.toFixed(4)}°
+                Location: {latestResult.location_m.toFixed(2)} m | Lat: {latestResult.latitude.toFixed(4)}°, Lon: {latestResult.longitude.toFixed(4)}°
               </div>
             )}
             <p className="text-sm opacity-80 mt-4">
@@ -247,7 +256,7 @@ export default function Logs() {
               <div className="text-[9px] text-slate-400">meters</div>
             </div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 text-center">
-              <div className="text-sm font-bold text-slate-400 uppercase">Status</div>
+              <div className="text-sm font-bold text-slate-400 uppercase">Monitoring</div>
               <div className={`text-lg font-black mt-1 ${isMonitoring ? "text-emerald-600" : "text-slate-400"}`}>
                 {isMonitoring ? "🟢 LIVE" : "⚪ IDLE"}
               </div>
