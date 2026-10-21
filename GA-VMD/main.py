@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from vmdpy import VMD
 import pygad
@@ -11,11 +12,24 @@ from utils import *
 import config
 
 # ================= FIREBASE SETUP =================
-cred = credentials.Certificate("serviceAccountKey.json")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIAL_CANDIDATES = [
+    os.path.join(BASE_DIR, "serviceAccountKey.json"),
+    os.path.join(BASE_DIR, "serviceAccountkey.json"),
+]
 
-firebase_admin.initialize_app(cred, {
-    'databaseURL': 'https://pipeline-fault-detecting-syste-default-rtdb.firebaseio.com/'
-})
+credential_path = next((p for p in CREDENTIAL_CANDIDATES if os.path.exists(p)), CREDENTIAL_CANDIDATES[0])
+print(f"Using Firebase credentials: {credential_path}")
+
+cred = credentials.Certificate(credential_path)
+
+try:
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://pipeline-fault-detecting-syste-default-rtdb.firebaseio.com/'
+    })
+except ValueError:
+    # App already initialized in a reused Python process; continue with the existing app.
+    pass
 
 ref = db.reference('/pipeline')
 result_ref = db.reference('/results')
@@ -162,8 +176,11 @@ while True:
             u, _, _ = VMD(x, BEST_ALPHA, tau=0, K=BEST_K, DC=0, init=1, tol=1e-7)
             clean_signal = np.sum(u, axis=0)
 
+            signal_std = float(np.std(clean_signal))
+            print(f"Clean signal std: {signal_std:.6f} | threshold: {config.LEAK_THRESHOLD}")
+
             # 🚨 Leak detection
-            is_leak = np.std(clean_signal) > 0.5
+            is_leak = signal_std > config.LEAK_THRESHOLD
 
             # 📍 Location
             delay = np.argmax(clean_signal) - np.argmax(x)
