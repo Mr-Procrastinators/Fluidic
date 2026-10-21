@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useScadaData, usePipelineData } from "@/hooks/useFirebaseData";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { database, ref, set } from "@/lib/firebase";
@@ -6,9 +7,24 @@ export default function ControlPanel() {
   const scada = useScadaData();
   const pipeline = usePipelineData();
 
-  console.log("ControlPanel mounted/rendered with data:", { scada, pipeline });
+  const [pumpState, setPumpState] = useState<number>(scada.pump ?? 0);
+  const [valveState, setValveState] = useState<number>(scada.valve ?? 0);
+  const [modeState, setModeState] = useState<string>(scada.mode || "AUTO");
+
+  useEffect(() => {
+    setPumpState(scada.pump ?? 0);
+  }, [scada.pump]);
+
+  useEffect(() => {
+    setValveState(scada.valve ?? 0);
+  }, [scada.valve]);
+
+  useEffect(() => {
+    setModeState(scada.mode || "AUTO");
+  }, [scada.mode]);
 
   const setPump = (val: number) => {
+    setPumpState(val);
     try {
       set(ref(database, "SCADA_DATA/pump"), val);
     } catch (e) {
@@ -17,6 +33,7 @@ export default function ControlPanel() {
   };
 
   const setValve = (val: number) => {
+    setValveState(val);
     try {
       set(ref(database, "SCADA_DATA/valve"), val);
     } catch (e) {
@@ -25,6 +42,7 @@ export default function ControlPanel() {
   };
 
   const setMode = (val: string) => {
+    setModeState(val);
     try {
       set(ref(database, "SCADA_DATA/mode"), val);
     } catch (e) {
@@ -34,7 +52,6 @@ export default function ControlPanel() {
 
   return (
     <div className="space-y-4 min-h-screen">
-      {/* Top stat cards - Pressure is calculated from flow values using Bernoulli principle */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 border-l-4 border-l-blue-500">
           <div className="text-[10px] font-bold uppercase text-slate-400">Flow Rate</div>
@@ -46,21 +63,20 @@ export default function ControlPanel() {
         </div>
         <div className="rounded-2xl shadow-sm border border-slate-700 p-4" style={{ backgroundColor: "#1e293b" }}>
           <div className="text-[10px] font-bold uppercase text-slate-400">Operating Mode</div>
-          <select value={scada.mode || "AUTO"} onChange={(e) => setMode(e.target.value)} className="mt-1 bg-blue-600 text-white font-bold text-sm rounded-lg px-3 py-1.5 border-0 outline-none cursor-pointer">
+          <select value={modeState} onChange={(e) => setMode(e.target.value)} className="mt-1 bg-blue-600 text-white font-bold text-sm rounded-lg px-3 py-1.5 border-0 outline-none cursor-pointer">
             <option value="AUTO">AUTO</option>
             <option value="MANUAL">MANUAL</option>
           </select>
         </div>
       </div>
 
-      {/* Pump & Valve */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <SectionHeader title="Pump Engine (P1)" />
           <div className="p-6 text-center">
             <div className="text-5xl mb-3">P1</div>
-            <div className={`text-2xl font-black mb-1 ${scada.pump === 1 ? "text-emerald-500" : "text-red-500"}`}>{scada.pump === 1 ? "RUNNING" : "STOPPED"}</div>
-            {scada.pump === 1 && <div className="w-3 h-3 mx-auto rounded-full bg-emerald-400 animate-ping mb-3" />}
+            <div className={`text-2xl font-black mb-1 ${pumpState === 1 ? "text-emerald-500" : "text-red-500"}`}>{pumpState === 1 ? "RUNNING" : "STOPPED"}</div>
+            {pumpState === 1 && <div className="w-3 h-3 mx-auto rounded-full bg-emerald-400 animate-ping mb-3" />}
             <div className="flex gap-3 justify-center mt-4">
               <button onClick={() => setPump(1)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase px-6 py-2.5 rounded-lg transition-colors">Start Pump</button>
               <button onClick={() => setPump(0)} className="bg-red-600 hover:bg-red-700 text-white font-black text-[10px] uppercase px-6 py-2.5 rounded-lg transition-colors">Stop Pump</button>
@@ -72,7 +88,7 @@ export default function ControlPanel() {
           <SectionHeader title="Emergency Gate Valve (V1)" />
           <div className="p-6 text-center">
             <div className="text-5xl mb-3">V1</div>
-            <div className={`text-2xl font-black mb-4 ${scada.valve === 1 ? "text-blue-500" : "text-slate-500"}`}>{scada.valve === 1 ? "OPEN" : "CLOSED"}</div>
+            <div className={`text-2xl font-black mb-4 ${valveState === 1 ? "text-blue-500" : "text-slate-500"}`}>{valveState === 1 ? "OPEN" : "CLOSED"}</div>
             <div className="flex gap-3 justify-center">
               <button onClick={() => setValve(1)} className="bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase px-6 py-2.5 rounded-lg transition-colors">Open Valve</button>
               <button onClick={() => setValve(0)} className="text-white font-black text-[10px] uppercase px-6 py-2.5 rounded-lg transition-colors" style={{ backgroundColor: "#334155" }}>Shut Valve</button>
@@ -81,7 +97,6 @@ export default function ControlPanel() {
         </div>
       </div>
 
-      {/* Tank & Sensors */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <SectionHeader title="Water Tank Level" />
