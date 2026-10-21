@@ -50,33 +50,30 @@ FirebaseConfig config;
 // GLOBAL VARIABLES
 // ============================================================================
 struct ScadaData {
-  float flow1;       // Inlet Flow (L/min)
-  float flow2;       // Outlet Flow (L/min)
-  float level;       // Tank Level (0-100%)
-  int pump;          // Pump State (0=OFF, 1=ON)
-  String mode;       // Operating Mode (AUTO/MANUAL)
-  float pressure;    // Calculated Pressure (bar)
-  int valve;         // Valve State (0=CLOSED, 1=OPEN)
+  float flow1;
+  float flow2;
+  float level;
+  int pump;
+  String mode;
+  float pressure;
+  int valve;
 };
 
 struct PipelineData {
-  int tds;           // Total Dissolved Solids (ppm)
-  float turbidity;   // Turbidity (NTU)
-  float ph;          // pH Level
+  int tds;
+  float turbidity;
+  float ph;
 };
 
 ScadaData scada = {0, 0, 0, 0, "AUTO", 0, 0};
 PipelineData pipeline = {0, 0, 0};
 
 unsigned long lastUpdateTime = 0;
-const unsigned long UPDATE_INTERVAL = 1000; // Update every 1 second
+const unsigned long UPDATE_INTERVAL = 200; // Faster loop for faster pump/valve response
 
-// Flow sensor calibration (adjust based on your sensor specs)
-const float FLOW_CALIBRATION_FACTOR = 7.5; // pulses per liter
-
-// Pressure calculation constants (from utils.py)
-const float PIPE_DIAMETER = 0.02;    // 20mm diameter
-const float RHO = 1000;              // Water density (kg/m³)
+// Pressure calculation constants
+const float PIPE_DIAMETER = 0.02;
+const float RHO = 1000;
 
 // ============================================================================
 // SETUP FUNCTION
@@ -85,7 +82,6 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
-  // Initialize sensor pins
   pinMode(FLOW_SENSOR_1_PIN, INPUT);
   pinMode(FLOW_SENSOR_2_PIN, INPUT);
   pinMode(TDS_SENSOR_PIN, INPUT);
@@ -93,21 +89,16 @@ void setup() {
   pinMode(PH_SENSOR_PIN, INPUT);
   pinMode(LEVEL_SENSOR_PIN, INPUT);
 
-  // Initialize control relay pins
   pinMode(PUMP_RELAY_PIN, OUTPUT);
   pinMode(VALVE_RELAY_PIN, OUTPUT);
 
-  // Set initial relay states (OFF)
   digitalWrite(PUMP_RELAY_PIN, LOW);
   digitalWrite(VALVE_RELAY_PIN, LOW);
 
   Serial.println("\n\nFLUIDIC Smart Pipeline Monitoring - ESP32 Hardware");
   Serial.println("Initializing...");
 
-  // Connect to WiFi
   connectToWiFi();
-
-  // Setup Firebase
   setupFirebase();
 
   Serial.println("Setup Complete - Ready for Real-time Data Transmission");
@@ -118,27 +109,17 @@ void setup() {
 // ============================================================================
 void loop() {
   if (WiFi.status() == WL_CONNECTED && Firebase.ready()) {
+    readControlCommands();
+
     unsigned long currentTime = millis();
 
     if (currentTime - lastUpdateTime >= UPDATE_INTERVAL) {
       lastUpdateTime = currentTime;
 
-      // Read sensor values
       readSensors();
-
-      // Calculate pressure from flow values (using utils.py formula)
       calculatePressure();
-
-      // Send SCADA data to Firebase
       sendScadaData();
-
-      // Send Pipeline data to Firebase
       sendPipelineData();
-
-      // Read control commands from Firebase
-      readControlCommands();
-
-      // Print debug info
       printDebugInfo();
     }
   } else {
@@ -184,24 +165,19 @@ void connectToWiFi() {
 // FIREBASE SETUP
 // ============================================================================
 void setupFirebase() {
-  // Assign the Firebase project ID
   config.api_key = API_KEY;
   config.database_url = FIREBASE_DATABASE_URL;
 
-  // Anonymous authentication
   auth.user.email = "";
   auth.user.password = "";
 
-  config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+  config.token_status_callback = tokenStatusCallback;
   config.max_token_generation_retry = 5;
-
-  // Limit the size of response payload to be collected before returning
-  config.resp_size = 2048; // bytes
+  config.resp_size = 2048;
 
   Firebase.begin(&config, &auth);
   Firebase.reconnectNetwork(true);
 
-  // Since we use Anonymous sign-in, initialize without credentials
   if (!Firebase.signUp(&config, &auth, "", "")) {
     Serial.println(F("Anonymous sign-up failed"));
     Serial.println(Firebase.errorReason());
@@ -215,40 +191,28 @@ void setupFirebase() {
 // SENSOR READING FUNCTIONS
 // ============================================================================
 void readSensors() {
-  // Read Flow Sensor 1 (Inlet)
   scada.flow1 = readFlowSensor(FLOW_SENSOR_1_PIN);
-
-  // Read Flow Sensor 2 (Outlet)
   scada.flow2 = readFlowSensor(FLOW_SENSOR_2_PIN);
 
-  // Read Tank Level (map 0-4095 ADC to 0-100%)
   int levelRaw = analogRead(LEVEL_SENSOR_PIN);
   scada.level = map(levelRaw, 0, 4095, 0, 100);
 
-  // Read TDS Sensor (0-4095 ADC to 0-2000 ppm)
   int tdsRaw = analogRead(TDS_SENSOR_PIN);
   pipeline.tds = map(tdsRaw, 0, 4095, 0, 2000);
 
-  // Read Turbidity Sensor (0-5V to 0-100 NTU)
   int turbidityRaw = analogRead(TURBIDITY_SENSOR_PIN);
   pipeline.turbidity = (turbidityRaw / 4095.0) * 100.0;
 
-  // Read pH Sensor (0-5V to 0-14 pH)
   int phRaw = analogRead(PH_SENSOR_PIN);
   pipeline.ph = (phRaw / 4095.0) * 14.0;
 }
 
-// ============================================================================
-// FLOW SENSOR READING (Simplified - expects analog 0-5V)
-// For pulse-based sensors, use interrupt counting instead
-// ============================================================================
+// Flow sensor read
 float readFlowSensor(int pin) {
-  // For analog flow sensors: convert 0-5V to 0-100 L/min
   int rawValue = analogRead(pin);
   float voltage = (rawValue / 4095.0) * 5.0;
-  float flow = (voltage / 5.0) * 100.0; // Scale to 0-100 L/min
+  float flow = (voltage / 5.0) * 100.0;
 
-  // Apply simple low-pass filter for stability
   static float prevFlow1 = 0, prevFlow2 = 0;
   float filtered;
 
@@ -263,31 +227,16 @@ float readFlowSensor(int pin) {
   return filtered;
 }
 
-// ============================================================================
-// PRESSURE CALCULATION (from utils.py: flow_to_pressure)
-// P = 0.5 * rho * v^2, where v = Q / A
-// ============================================================================
 void calculatePressure() {
-  // Use average of inlet flow for pressure calculation
   float flowLPerMin = scada.flow1;
-
-  // Convert L/min to m³/s: Q = (flow / (1000 * 60))
   float Q = flowLPerMin / (1000.0 * 60.0);
-
-  // Calculate cross-sectional area: A = π * (d/2)²
   float A = 3.14159 * (PIPE_DIAMETER / 2.0) * (PIPE_DIAMETER / 2.0);
-
-  // Calculate velocity: v = Q / A
   float v = Q / A;
-
-  // Calculate pressure: P = 0.5 * rho * v²
-  // Result is in Pascals, convert to bar (1 bar = 100,000 Pa)
   float pressurePa = 0.5 * RHO * v * v;
-  scada.pressure = pressurePa / 100000.0; // Convert to bar
+  scada.pressure = pressurePa / 100000.0;
 
-  // Limit to reasonable range
   if (scada.pressure < 0) scada.pressure = 0;
-  if (scada.pressure > 20) scada.pressure = 20; // Max 20 bar
+  if (scada.pressure > 20) scada.pressure = 20;
 }
 
 // ============================================================================
@@ -296,7 +245,6 @@ void calculatePressure() {
 void sendScadaData() {
   if (!Firebase.ready()) return;
 
-  // Create JSON with SCADA data
   FirebaseJson json;
   json.set("flow1", (double)scada.flow1);
   json.set("flow2", (double)scada.flow2);
@@ -307,7 +255,6 @@ void sendScadaData() {
   json.set("valve", scada.valve);
   json.set("timestamp", getTimestamp());
 
-  // Send to Firebase at SCADA_DATA path
   if (Firebase.RTDB.setJSON(&fbdo, "/SCADA_DATA", &json)) {
     Serial.println("✓ SCADA data sent to Firebase");
   } else {
@@ -322,14 +269,12 @@ void sendScadaData() {
 void sendPipelineData() {
   if (!Firebase.ready()) return;
 
-  // Create JSON with Pipeline data
   FirebaseJson json;
   json.set("tds", (int)pipeline.tds);
   json.set("turbidity", (double)pipeline.turbidity);
   json.set("ph", (double)pipeline.ph);
   json.set("timestamp", getTimestamp());
 
-  // Send to Firebase at pipeline path
   if (Firebase.RTDB.setJSON(&fbdo, "/pipeline", &json)) {
     Serial.println("✓ Pipeline data sent to Firebase");
   } else {
@@ -344,7 +289,6 @@ void sendPipelineData() {
 void readControlCommands() {
   if (!Firebase.ready()) return;
 
-  // Read pump state (0=OFF, 1=ON)
   if (Firebase.RTDB.getInt(&fbdo, "/SCADA_DATA/pump")) {
     int pumpCmd = fbdo.intData();
     if (pumpCmd != scada.pump) {
@@ -355,7 +299,6 @@ void readControlCommands() {
     }
   }
 
-  // Read valve state (0=CLOSED, 1=OPEN)
   if (Firebase.RTDB.getInt(&fbdo, "/SCADA_DATA/valve")) {
     int valveCmd = fbdo.intData();
     if (valveCmd != scada.valve) {
@@ -366,7 +309,6 @@ void readControlCommands() {
     }
   }
 
-  // Read operating mode (AUTO/MANUAL)
   if (Firebase.RTDB.getString(&fbdo, "/SCADA_DATA/mode")) {
     String modeCmd = fbdo.stringData();
     if (modeCmd != scada.mode) {
@@ -397,8 +339,6 @@ void tokenStatusCallback(token_info_t info) {
 // UTILITY FUNCTIONS
 // ============================================================================
 unsigned long getTimestamp() {
-  // For real timestamp, integrate NTP time
-  // For now, return millis() which resets on reboot
   return millis();
 }
 
