@@ -30,18 +30,24 @@ export default function Dashboard() {
     countRef.current++;
   }, [scada.flow1, scada.flow2, hasLiveScadaData]);
 
-  const leakDetected = gavmdResult?.status === "LEAK";
+  const detectionStatus = gavmdResult?.status ?? "UNKNOWN";
   const criticalAlerts = alerts.filter((a) => a.severity === "critical" || a.severity === "high").length;
+  const detectionBadgeStyle =
+    detectionStatus === "LEAK"
+      ? "bg-red-100 text-red-700 border-red-300"
+      : detectionStatus === "NORMAL"
+        ? "bg-emerald-100 text-emerald-700 border-emerald-300"
+        : "bg-slate-100 text-slate-600 border-slate-300";
 
   return (
     <div className="space-y-4">
       <div className="flex gap-3 flex-wrap">
-        <div
-          className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase ${
-            leakDetected ? "bg-red-100 text-red-700 border border-red-300" : "bg-emerald-100 text-emerald-700 border border-emerald-300"
-          }`}
-        >
-          {leakDetected ? "⚠ LEAK DETECTED" : "✓ NORMAL"}
+        <div className={`px-4 py-2 rounded-lg border text-[10px] font-black uppercase ${detectionBadgeStyle}`}>
+          {detectionStatus === "LEAK"
+            ? "⚠ LEAK DETECTED"
+            : detectionStatus === "NORMAL"
+              ? "✓ NORMAL"
+              : "WAITING FOR ANALYSIS"}
         </div>
         <div className="px-4 py-2 rounded-lg bg-red-100 text-red-700 border border-red-300 text-[10px] font-black uppercase">
           Active Alerts: {criticalAlerts}
@@ -66,12 +72,13 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <SectionHeader title="Flow & Storage" />
+            <SectionHeader title="Flow, Pressure & Storage" />
             <div className="p-4 flex justify-around flex-wrap gap-4">
               {hasLiveScadaData ? (
                 <>
                   <RadialGauge value={scada.flow1} max={100} label="Inlet Flow" unit="L/min" color="#2563eb" />
                   <RadialGauge value={scada.flow2} max={100} label="Outlet Flow" unit="L/min" color="#06b6d4" />
+                  <RadialGauge value={scada.pressure} max={20} label="Pressure" unit="bar" color="#7c3aed" />
                   <RadialGauge value={scada.level} max={100} label="Storage Level" unit="%" color="#f97316" />
                 </>
               ) : (
