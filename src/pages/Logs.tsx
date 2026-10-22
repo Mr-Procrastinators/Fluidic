@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { database, ref, onValue } from "@/lib/firebase";
 import { normalizeGAVMDResult, type GAVMDResult } from "@/lib/gavmd";
+import { useScadaData } from "@/hooks/useFirebaseData";
+import { calculateDynamicPressurePa } from "@/lib/pressure";
 
 interface LogEntry {
   id: string;
@@ -10,6 +12,7 @@ interface LogEntry {
 }
 
 export default function Logs() {
+  const scada = useScadaData();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [latestResult, setLatestResult] = useState<GAVMDResult | null>(null);
   const [now, setNow] = useState<number>(Date.now());
@@ -64,8 +67,14 @@ export default function Logs() {
       color: rgb(0.1, 0.2, 0.35),
     });
 
-    const statusText = latestResult?.status === "LEAK" ? "LEAK DETECTED" : "NORMAL";
-    const statusColor = latestResult?.status === "LEAK" ? rgb(0.8, 0.1, 0.2) : rgb(0.12, 0.55, 0.3);
+    const statusText = latestResult
+      ? latestResult.status === "LEAK" ? "LEAK DETECTED" : "NORMAL"
+      : "WAITING FOR ANALYSIS";
+    const statusColor = !latestResult
+      ? rgb(0.35, 0.4, 0.48)
+      : latestResult.status === "LEAK"
+        ? rgb(0.8, 0.1, 0.2)
+        : rgb(0.12, 0.55, 0.3);
 
     page.drawText("Status:", {
       x: 50,
@@ -182,6 +191,17 @@ export default function Logs() {
   };
 
   const isResultFresh = !!latestResult && Math.abs(now / 1000 - latestResult.timestamp) < 60;
+  const hasLiveScadaData = [scada.flow1, scada.flow2, scada.pressure].some((value) => value !== 0);
+  const liveResult = isResultFresh ? latestResult : null;
+  const currentFlow = liveResult?.flow ?? (hasLiveScadaData ? scada.flow1 : null);
+  const calculatedPressurePa = liveResult?.pressure_pa ??
+    (currentFlow == null ? null : calculateDynamicPressurePa(currentFlow));
+  const currentStatus = liveResult?.status ?? (latestResult ? "STALE" : "WAITING");
+  const statusStyles = currentStatus === "LEAK"
+    ? "bg-red-100 border-red-300 text-red-700"
+    : currentStatus === "NORMAL"
+      ? "bg-emerald-100 border-emerald-300 text-emerald-700"
+      : "bg-slate-100 border-slate-300 text-slate-600";
 
   return (
     <div className="w-full">
@@ -193,6 +213,56 @@ export default function Logs() {
           >
             Export PDF Form
           </button>
+        </div>
+
+        <div className={`rounded-3xl shadow-sm border p-6 text-center ${statusStyles}`}>
+          <div className="text-xs font-bold uppercase tracking-[0.2em]">Current GA-VMD Status</div>
+          <div className="text-2xl lg:text-3xl font-black mt-2">
+            {currentStatus === "LEAK"
+              ? "⚠️ LEAK DETECTED"
+              : currentStatus === "NORMAL"
+                ? "✓ NORMAL"
+                : currentStatus === "STALE"
+                  ? "STALE — WAITING FOR ANALYSIS"
+                  : "WAITING FOR ANALYSIS"}
+          </div>
+          {currentStatus === "LEAK" && liveResult && (
+            <div className="text-sm font-bold mt-3">
+              Leak location: {liveResult.location_m.toFixed(2)} m
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 text-center">
+            <div className="text-xs font-bold text-slate-400 uppercase">Flow Rate</div>
+            <div className="text-2xl font-black mt-2 text-blue-600">
+              {currentFlow == null ? "N/A" : currentFlow.toFixed(2)}
+            </div>
+            <div className="text-xs text-slate-400">L/min</div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 text-center">
+            <div className="text-xs font-bold text-slate-400 uppercase">Calculated Pressure</div>
+            <div className="text-2xl font-black mt-2 text-violet-600">
+              {calculatedPressurePa == null ? "N/A" : calculatedPressurePa.toFixed(2)}
+            </div>
+            <div className="text-xs text-slate-400">Pa</div>
+            <div className="text-sm font-bold text-violet-600">
+              {calculatedPressurePa == null ? "" : `${(calculatedPressurePa / 100000).toFixed(5)} bar`}
+            </div>
+            <div className="text-[10px] text-slate-400">Dynamic pressure · 20 mm pipe</div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 text-center">
+            <div className="text-xs font-bold text-slate-400 uppercase">Monitoring</div>
+            <div className={`text-xl font-black mt-2 ${isResultFresh ? "text-emerald-600" : hasLiveScadaData ? "text-blue-600" : "text-slate-400"}`}>
+              {isResultFresh ? "GA-VMD LIVE" : hasLiveScadaData ? "SCADA LIVE" : "WAITING"}
+            </div>
+            {latestResult && (
+              <div className="text-[10px] text-slate-400 mt-1">
+                Last analysis: {new Date(latestResult.timestamp * 1000).toLocaleTimeString()}
+              </div>
+            )}
+          </div>
         </div>
 
         {latestResult && isResultFresh ? (
