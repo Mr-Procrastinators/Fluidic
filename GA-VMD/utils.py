@@ -1,6 +1,23 @@
 import numpy as np
 import math
 
+
+def extract_flow(data):
+    if not isinstance(data, dict):
+        return None
+
+    for key in ("flow", "flow1", "inletFlow"):
+        try:
+            value = float(data[key])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        if math.isfinite(value):
+            return value
+
+    return None
+
+
 # STEP 2
 def flow_to_pressure(flow_array, diameter=0.02):
     rho = 1000

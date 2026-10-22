@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { database, ref, onValue } from "@/lib/firebase";
+import { normalizeGAVMDResult, type GAVMDResult } from "@/lib/gavmd";
 
 export interface ScadaData {
   flow1: number;
@@ -113,6 +114,44 @@ export function useScadaData() {
   }, []);
 
   return data;
+}
+
+export function useGAVMDResult() {
+  const [result, setResult] = useState<GAVMDResult | null>(null);
+
+  useEffect(() => {
+    const resultsByPath = new Map<string, GAVMDResult>();
+    const paths = ["results", "gavmd_result"];
+    const unsubscribers = paths.map((path) =>
+      onValue(
+        ref(database, path),
+        (snapshot) => {
+          if (!snapshot.exists()) {
+            resultsByPath.delete(path);
+          } else {
+            const nextResult = normalizeGAVMDResult(snapshot.val());
+            if (nextResult) resultsByPath.set(path, nextResult);
+          }
+
+          const latest = [...resultsByPath.entries()].sort(
+            ([pathA, resultA], [pathB, resultB]) =>
+              resultB.timestamp - resultA.timestamp ||
+              (pathA === "results" ? -1 : pathB === "results" ? 1 : 0)
+          )[0]?.[1] ?? null;
+          setResult(latest);
+        },
+        (error) => {
+          console.error(`Firebase ${path} error:`, error);
+        }
+      )
+    );
+
+    return () => {
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, []);
+
+  return result;
 }
 
 export function usePipelineData() {

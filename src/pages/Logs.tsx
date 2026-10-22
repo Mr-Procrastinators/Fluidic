@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { database, ref, onValue } from "@/lib/firebase";
-
-interface GAVMDResult {
-  status: "LEAK" | "NORMAL";
-  location_m: number;
-  latitude: number;
-  longitude: number;
-  flow: number;
-  timestamp: number;
-}
+import { normalizeGAVMDResult, type GAVMDResult } from "@/lib/gavmd";
 
 interface LogEntry {
   id: string;
@@ -20,7 +12,6 @@ interface LogEntry {
 export default function Logs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [latestResult, setLatestResult] = useState<GAVMDResult | null>(null);
-  const [isMonitoring, setIsMonitoring] = useState(false);
   const [now, setNow] = useState<number>(Date.now());
 
   useEffect(() => {
@@ -35,28 +26,22 @@ export default function Logs() {
       return onValue(dbRef, (snapshot) => {
         if (!snapshot.exists()) return;
 
-        const data = snapshot.val();
-        if (!data || typeof data !== "object") return;
+        const result = normalizeGAVMDResult(snapshot.val());
+        if (!result) return;
 
-        const result: GAVMDResult = {
-          status: data.status === "LEAK" ? "LEAK" : "NORMAL",
-          location_m: Number(data.location_m ?? 0),
-          latitude: Number(data.latitude ?? 0),
-          longitude: Number(data.longitude ?? 0),
-          flow: Number(data.flow ?? 0),
-          timestamp: Number(data.timestamp ?? Date.now() / 1000),
-        };
-
-        setLatestResult(result);
-        setIsMonitoring(true);
+        setLatestResult((previous) =>
+          !previous || result.timestamp >= previous.timestamp ? result : previous
+        );
 
         const newLog: LogEntry = {
-          id: `${path}-${result.timestamp}-${Math.random().toString(16).slice(2)}`,
+          id: `${result.timestamp}-${result.status}-${result.flow}-${result.pressure_pa ?? ""}`,
           result,
           createdAt: new Date(result.timestamp * 1000),
         };
 
         setLogs((prev) => [newLog, ...prev.filter((log) => log.id !== newLog.id)].slice(0, 100));
+      }, (error) => {
+        console.error(`Firebase ${path} error:`, error);
       });
     });
 
@@ -114,9 +99,20 @@ export default function Logs() {
       color: rgb(0.1, 0.1, 0.1),
     });
 
+    const pressureBar = latestResult?.pressure_pa == null
+      ? "Not available"
+      : `${(latestResult.pressure_pa / 100000).toFixed(5)} bar`;
+    page.drawText(`Calculated pressure: ${pressureBar}`, {
+      x: 50,
+      y: 610,
+      size: 14,
+      font,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+
     page.drawText(`Coordinates: ${latestResult ? latestResult.latitude.toFixed(4) : "0.0000"}°, ${latestResult ? latestResult.longitude.toFixed(4) : "0.0000"}°`, {
       x: 50,
-      y: 640,
+      y: 580,
       size: 14,
       font,
       color: rgb(0.1, 0.1, 0.1),
@@ -125,7 +121,7 @@ export default function Logs() {
     const timestamp = latestResult ? new Date(latestResult.timestamp * 1000).toLocaleString() : new Date().toLocaleString();
     page.drawText(`Timestamp: ${timestamp}`, {
       x: 50,
-      y: 610,
+      y: 550,
       size: 12,
       font,
       color: rgb(0.3, 0.3, 0.3),
@@ -148,17 +144,17 @@ export default function Logs() {
 
     const timestampField = pdfDoc.createTextField("timestampField");
     timestampField.setText(timestamp);
-    timestampField.setPosition(230, 615, 0);
+    timestampField.setPosition(230, 555, 0);
     timestampField.setSize(250, 20);
 
     const faultField = pdfDoc.createCheckBox("faultField");
     if (latestResult?.status === "LEAK") faultField.check();
-    faultField.setPosition(50, 585, 0);
+    faultField.setPosition(50, 520, 0);
     faultField.setSize(15, 15);
 
     page.drawText("Fault detected", {
       x: 75,
-      y: 586,
+      y: 521,
       size: 12,
       font,
       color: rgb(0.2, 0.2, 0.2),
@@ -234,7 +230,7 @@ export default function Logs() {
         )}
 
         {latestResult && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 text-center">
               <div className="text-sm font-bold text-slate-400 uppercase">Status</div>
               <div className={`text-xl font-black mt-1 ${latestResult.status === "LEAK" ? "text-red-600" : "text-emerald-600"}`}>
@@ -256,9 +252,16 @@ export default function Logs() {
               <div className="text-[9px] text-slate-400">meters</div>
             </div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 text-center">
+              <div className="text-sm font-bold text-slate-400 uppercase">Calculated Pressure</div>
+              <div className="text-xl font-black mt-1 text-emerald-600">
+                {latestResult.pressure_pa == null ? "N/A" : (latestResult.pressure_pa / 100000).toFixed(5)}
+              </div>
+              <div className="text-[9px] text-slate-400">bar</div>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 text-center">
               <div className="text-sm font-bold text-slate-400 uppercase">Monitoring</div>
-              <div className={`text-lg font-black mt-1 ${isMonitoring ? "text-emerald-600" : "text-slate-400"}`}>
-                {isMonitoring ? "🟢 LIVE" : "⚪ IDLE"}
+              <div className={`text-lg font-black mt-1 ${isResultFresh ? "text-emerald-600" : "text-slate-400"}`}>
+                {isResultFresh ? "🟢 LIVE" : "⚪ IDLE"}
               </div>
             </div>
           </div>
@@ -277,6 +280,7 @@ export default function Logs() {
                     <th className="text-left p-3 font-bold text-slate-600 text-[10px]">Time</th>
                     <th className="text-left p-3 font-bold text-slate-600 text-[10px]">Status</th>
                     <th className="text-left p-3 font-bold text-slate-600 text-[10px]">Flow (L/min)</th>
+                    <th className="text-left p-3 font-bold text-slate-600 text-[10px]">Pressure (bar)</th>
                     <th className="text-left p-3 font-bold text-slate-600 text-[10px]">Location (m)</th>
                     <th className="text-left p-3 font-bold text-slate-600 text-[10px]">Coordinates</th>
                   </tr>
@@ -297,6 +301,9 @@ export default function Logs() {
                       </td>
                       <td className="p-3 font-bold text-blue-600 text-[10px]">
                         {log.result.flow.toFixed(2)}
+                      </td>
+                      <td className="p-3 font-bold text-emerald-600 text-[10px]">
+                        {log.result.pressure_pa == null ? "N/A" : (log.result.pressure_pa / 100000).toFixed(5)}
                       </td>
                       <td className="p-3 font-bold text-indigo-600 text-[10px]">
                         {log.result.location_m.toFixed(1)}

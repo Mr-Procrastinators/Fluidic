@@ -1,4 +1,4 @@
-import { useScadaData, usePipelineData, useAlerts } from "@/hooks/useFirebaseData";
+import { useScadaData, usePipelineData, useAlerts, useGAVMDResult } from "@/hooks/useFirebaseData";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { RadialGauge } from "@/components/shared/RadialGauge";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -8,6 +8,7 @@ export default function Dashboard() {
   const scada = useScadaData();
   const pipeline = usePipelineData();
   const alerts = useAlerts();
+  const gavmdResult = useGAVMDResult();
   const [flowHistory, setFlowHistory] = useState<{ time: string; inlet: number; outlet: number }[]>([]);
   const countRef = useRef(0);
 
@@ -29,7 +30,7 @@ export default function Dashboard() {
     countRef.current++;
   }, [scada.flow1, scada.flow2, hasLiveScadaData]);
 
-  const leakDetected = hasLiveScadaData && Math.abs(scada.flow1 - scada.flow2) > 5;
+  const leakDetected = gavmdResult?.status === "LEAK";
   const criticalAlerts = alerts.filter((a) => a.severity === "critical" || a.severity === "high").length;
 
   return (
@@ -37,10 +38,10 @@ export default function Dashboard() {
       <div className="flex gap-3 flex-wrap">
         <div
           className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase ${
-            leakDetected ? "bg-red-100 text-red-700 border border-red-300" : hasLiveScadaData ? "bg-emerald-100 text-emerald-700 border border-emerald-300" : "bg-slate-100 text-slate-500 border border-slate-300"
+            leakDetected ? "bg-red-100 text-red-700 border border-red-300" : "bg-emerald-100 text-emerald-700 border border-emerald-300"
           }`}
         >
-          {hasLiveScadaData ? (leakDetected ? "⚠ LEAK DETECTED" : "✓ NO LEAK") : "NORMAL CONDITION"}
+          {leakDetected ? "⚠ LEAK DETECTED" : "✓ NORMAL"}
         </div>
         <div className="px-4 py-2 rounded-lg bg-red-100 text-red-700 border border-red-300 text-[10px] font-black uppercase">
           Active Alerts: {criticalAlerts}

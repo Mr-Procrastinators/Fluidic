@@ -74,8 +74,9 @@ For accuracy, calibrate `WAVE_SPEED` based on your pipe type:
 ### Phase 1: Training (First 100 samples)
 
 ```
-1. Collect flow measurements from Firebase (/pipeline/flow)
-2. Wait for 100 samples (default: ~100 seconds at 1Hz)
+1. Collect inlet flow measurements from Firebase (`/SCADA_DATA/flow1`)
+   - Older setups using `/pipeline/flow` are also supported as a fallback.
+2. Wait for 10 samples (default: ~10 seconds at 1Hz)
 3. Prepare signal:
    - Convert flow data to pressure equivalent
    - Create dual signal (x1, x2) for comparison
@@ -105,7 +106,7 @@ Loop continuously:
      - Extract clean signal (sum of IMFs)
      - Calculate standard deviation
   4. Leak detection:
-     - If std_dev > 0.5 → LEAK
+     - If std_dev > `LEAK_THRESHOLD` in `config.py` → LEAK
      - Otherwise → NORMAL
   5. Leak localization (if leak detected):
      - Calculate time delay between signals
@@ -118,6 +119,7 @@ Loop continuously:
        "latitude": calculated latitude,
        "longitude": calculated longitude,
        "flow": current flow rate,
+       "pressure_pa": calculated dynamic pressure in Pascals,
        "timestamp": current Unix timestamp
      }
   7. Wait 1 second, repeat
@@ -136,11 +138,11 @@ python main.py
 
 Output:
 ```
-⏳ Collecting data for GA training...
-1/100 → 9.87
-2/100 → 10.23
+⏳ Waiting for real flow data from ESP32...
+1/10 → 9.87
+2/10 → 10.23
 ...
-100/100 → 10.05
+10/10 → 10.05
 ✅ Data ready!
 
 🔧 Running GA...
@@ -198,16 +200,20 @@ The algorithm updates this structure every 1-2 seconds:
   "latitude": 26.8485,          // GPS latitude
   "longitude": 80.9512,         // GPS longitude
   "flow": 10.2,                 // Current flow rate L/min
+  "pressure_pa": 141.5,         // Calculated dynamic pressure in Pascals
   "timestamp": 1711857848       // Unix timestamp
 }
 ```
+
+The logs page converts the calculated pressure from Pascals to bar for display.
+This is dynamic pressure derived from flow, not a static pipe-pressure sensor reading.
 
 ### React Dashboard Updates
 
 The **GA-VMD Logs** page (`/logs`) automatically:
 1. Listens to `/results` in Firebase
 2. Displays latest result in hero card
-3. Shows metrics: Status, Flow, Distance, Live indicator
+3. Shows metrics: Status, Flow, calculated Pressure, Distance, Live indicator
 4. Logs last 100 detection events in a table
 5. Updates in real-time as algorithm runs
 
@@ -232,12 +238,11 @@ pip install --upgrade vmdpy
 
 ### 3. "Waiting for flow data forever"
 
-Make sure ESP32 is sending data to Firebase (`/pipeline/flow`). Check in React Dashboard if flow sensors are updating.
-
-If no real data, the script will use mock data (with warning):
-```
-⚠️ Using mock data
-```
+Make sure the ESP32 is sending inlet flow to `/SCADA_DATA/flow1`. The firmware in
+`HARDWARE/HARDWARE.ino` writes water-quality measurements to `/pipeline`, so
+`/pipeline/flow` is not present in that firmware. GA-VMD now checks the SCADA
+flow path first and keeps `/pipeline/flow` as a fallback for older installations.
+The algorithm intentionally waits for real sensor data and does not substitute mock values.
 
 ### 4. "GA fitness function returning -1e9"
 
@@ -261,13 +266,14 @@ The delay calculation is finding zero difference. Likely:
 
 **Increase sensitivity** (more false positives, catches smaller leaks):
 ```python
-# In main.py, line ~150
-is_leak = np.std(clean_signal) > 0.3  # Lower threshold
+# In config.py
+LEAK_THRESHOLD = 0.05  # Lower threshold
 ```
 
 **Decrease sensitivity** (fewer false positives):
 ```python
-is_leak = np.std(clean_signal) > 0.8  # Higher threshold
+# In config.py
+LEAK_THRESHOLD = 0.2  # Higher threshold
 ```
 
 ### For Better Localization

@@ -8,7 +8,7 @@ import math
 import firebase_admin
 from firebase_admin import credentials, db
 
-from utils import *
+from utils import correlation, extract_flow, flow_to_pressure, fuzzy_entropy
 import config
 
 # ================= FIREBASE SETUP =================
@@ -31,7 +31,8 @@ except ValueError:
     # App already initialized in a reused Python process; continue with the existing app.
     pass
 
-ref = db.reference('/pipeline')
+scada_ref = db.reference('/SCADA_DATA')
+legacy_pipeline_ref = db.reference('/pipeline')
 result_ref = db.reference('/results')
 
 # ================= PARAMETERS =================
@@ -44,19 +45,15 @@ START_LON = 80.9462
 
 
 def get_live_flow():
-    try:
-        data = ref.get()
-        if not data or "flow" not in data:
-            return None
-
-        flow_value = data["flow"]
+    for flow_ref in (scada_ref, legacy_pipeline_ref):
         try:
-            return float(flow_value)
-        except (TypeError, ValueError):
-            return None
-    except Exception as e:
-        print("Firebase read error:", e)
-        return None
+            flow = extract_flow(flow_ref.get())
+            if flow is not None:
+                return flow
+        except Exception as e:
+            print(f"Firebase read error at {flow_ref.path}: {e}")
+
+    return None
 
 
 def get_leak_location(L1):
@@ -109,18 +106,19 @@ def fitness_func(ga, solution, solution_idx):
 
         valid_imfs = []
         for imf in u:
-            if correlation(imf, x2) > 0.3:
+            imf_correlation = correlation(imf, x2)
+            if np.isfinite(imf_correlation) and imf_correlation > 0.3:
                 valid_imfs.append(imf)
 
-        if not valid_imfs:
-            return -1e9
-
-        reconstructed = np.sum(valid_imfs, axis=0)
+        reconstructed = np.sum(valid_imfs or u, axis=0)
         entropy = fuzzy_entropy(reconstructed)
+        if not np.isfinite(entropy):
+            return -1e9
 
         return -(entropy + 0.01 * K)
 
-    except Exception:
+    except Exception as e:
+        print(f"GA fitness evaluation failed: {e}")
         return -1e9
 
 
@@ -172,6 +170,7 @@ while True:
         if len(flow_buffer) == WINDOW_SIZE:
 
             x = flow_to_pressure(flow_buffer)
+            calculated_pressure_pa = float(x[-1])
 
             u, _, _ = VMD(x, BEST_ALPHA, tau=0, K=BEST_K, DC=0, init=1, tol=1e-7)
             clean_signal = np.sum(u, axis=0)
@@ -197,10 +196,12 @@ while True:
                 "latitude": float(lat),
                 "longitude": float(lon),
                 "flow": float(flow),
+                "pressure_pa": calculated_pressure_pa,
                 "timestamp": int(time.time())
             })
 
             print("Status:", "LEAK" if is_leak else "NORMAL")
+            print(f"Calculated pressure: {calculated_pressure_pa:.2f} Pa")
             print("Location (m):", L1)
             print("Lat:", lat, "Lon:", lon)
 
